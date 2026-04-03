@@ -45,45 +45,100 @@ function parseArticlesFromHTML(html: string): any[] {
   const articles: any[] = []
 
   try {
-    // 使用正则表达式提取文章信息
-    // 注意：这是一个简化的实现，实际生产环境需要更健壮的HTML解析
+    // 方法1: 尝试新的结构 - 使用通用链接和标题模式
+    // 搜狗新版页面可能使用不同的结构
 
-    // 提取文章标题和链接
-    const titleRegex = /<h3[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>.*?<\/h3>/gs
-    const titleMatches = html.matchAll(titleRegex)
+    // 提取所有包含文章链接的内容块
+    const blockRegex = /<a[^>]*href="([^"]*\.html)"[^>]*>([^<]*)<\/a>/gi
+    const blockMatches = [...html.matchAll(blockRegex)]
 
-    for (const match of titleMatches) {
+    for (const match of blockMatches) {
       const link = match[1]
       const title = match[2].replace(/<[^>]*>/g, '').trim()
 
-      if (title && link) {
-        // 提取摘要（在标题附近查找）
-        const summaryRegex = new RegExp(
-          `${escapeRegex(title)}[\\s\\S]{0,500}?<p[^>]*class="txt-info"[^>]*>([\\s\\S]*?)<\\/p>`,
-          'i'
-        )
-        const summaryMatch = html.match(summaryRegex)
-        const summary = summaryMatch
-          ? summaryMatch[1].replace(/<[^>]*>/g, '').trim()
-          : '暂无摘要'
+      // 过滤非文章链接
+      if (!link || !title || title.length < 5) continue
+      if (title.includes('查看更多') || title.includes('相关搜索')) continue
 
-        // 提取发布时间
-        const timeRegex = new RegExp(
-          `${escapeRegex(title)}[\\s\\S]{0,500}?<span[^>]*class="s2"[^>]*>([\\s\\S]*?)<\\/span>`,
-          'i'
-        )
-        const timeMatch = html.match(timeRegex)
-        const timeStr = timeMatch ? timeMatch[1].trim() : ''
-        const publishedAt = parsePublishTime(timeStr)
+      // 获取该标题附近的摘要和时间
+      const titlePos = html.indexOf(match[0])
+      const contextStart = Math.max(0, titlePos - 200)
+      const contextEnd = Math.min(html.length, titlePos + 500)
+      const context = html.slice(contextStart, contextEnd)
 
-        articles.push({
-          title,
-          summary: summary.substring(0, 200), // 限制摘要长度
-          link: link.startsWith('http') ? link : `https://weixin.sogou.com${link}`,
-          published_at: publishedAt
-        })
+      // 尝试提取摘要 - 查找<p>标签
+      let summary = '暂无摘要'
+      const pMatch = context.match(/<p[^>]*>([\s\S]*?)<\/p>/i)
+      if (pMatch) {
+        summary = pMatch[1].replace(/<[^>]*>/g, '').trim().substring(0, 200)
+      }
+
+      // 尝试提取时间
+      let publishedAt = new Date().toISOString()
+      const timeMatch = context.match(/(\d+)小时前|(\d+)天前|(\d+)分钟前/i)
+      if (timeMatch) {
+        publishedAt = parsePublishTime(timeMatch[0])
+      }
+
+      articles.push({
+        title,
+        summary: summary || '暂无摘要',
+        link: link.startsWith('http') ? link : `https://weixin.sogou.com${link}`,
+        published_at: publishedAt
+      })
+    }
+
+    // 方法2: 如果方法1没有返回结果，尝试备用结构
+    if (articles.length === 0) {
+      // 提取article-box或news-list中的内容
+      const altRegex = /<article[^>]*>[\s\S]*?<a[^>]*href="([^"]*)"[^>]*>([^<]+)<\/a>[\s\S]*?<p[^>]*>([^<]*)<\/p>/gi
+      const altMatches = [...html.matchAll(altRegex)]
+
+      for (const match of altMatches) {
+        const link = match[1]
+        const title = match[2].trim()
+        const summary = match[3].trim()
+
+        if (title && title.length > 5) {
+          articles.push({
+            title,
+            summary: summary.substring(0, 200),
+            link: link.startsWith('http') ? link : `https://weixin.sogou.com${link}`,
+            published_at: new Date().toISOString()
+          })
+        }
       }
     }
+
+    // 方法3: 简单的通用提取作为最后后备
+    if (articles.length === 0) {
+      const simpleRegex = /["'](https?:\/\/[^"']+\.html)["'][^>]*>([^<]{10,100})/g
+      const simpleMatches = [...html.matchAll(simpleRegex)]
+
+      for (const match of simpleMatches) {
+        const link = match[1]
+        const title = match[2].trim()
+
+        if (title && !title.includes('<img')) {
+          articles.push({
+            title,
+            summary: '暂无摘要',
+            link,
+            published_at: new Date().toISOString()
+          })
+        }
+      }
+    }
+
+    // 去重
+    const seen = new Set<string>()
+    const uniqueArticles = articles.filter((a) => {
+      if (seen.has(a.title)) return false
+      seen.add(a.title)
+      return true
+    })
+
+    return uniqueArticles.slice(0, 10)
   } catch (error) {
     console.error('解析HTML失败:', error)
   }
