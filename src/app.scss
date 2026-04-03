@@ -4,39 +4,40 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    /* 工具理性风配色方案 */
+    --background: 40 14% 97%; /* #F7F7F5 暖调浅灰 */
+    --foreground: 0 0% 10%; /* #1A1A1A 深墨色 */
+    --card: 0 0% 100%; /* 纯白卡片 */
+    --card-foreground: 0 0% 10%; /* #1A1A1A */
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
+    --popover-foreground: 0 0% 10%;
+    --primary: 0 0% 10%; /* #1A1A1A 深墨色 */
     --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 72.22% 50.59%;
+    --secondary: 150 30% 31%; /* #2E6F40 森绿 */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 88%; /* #E0E0E0 灰阶 */
+    --muted-foreground: 0 0% 40%; /* #666666 灰阶 */
+    --accent: 150 30% 31%; /* #2E6F40 森绿 */
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5% 64.9%;
-    --radius: 0.5rem;
+    --border: 0 0% 92%; /* #EBEBEB 极细灰线 */
+    --input: 0 0% 88%;
+    --ring: 150 30% 31%;
+    --radius: 0.125rem; /* 2px 极小圆角 */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-foreground: 0 0% 10%;
+    --sidebar-primary: 0 0% 10%;
     --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 240 5% 64.9%;
+    --sidebar-accent: 0 0% 88%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 92%;
+    --sidebar-ring: 150 30% 31%;
   }
 
   .dark {
