@@ -107,7 +107,7 @@ function DataSource() {
                 <input
                   className="w-full text-xl text-foreground bg-transparent outline-none"
                   type="text"
-                  placeholder="请输入第三方API密钥"
+                  placeholder="例如：sk_test_xxxxxxxxxxxxx"
                   value={apiKey}
                   onInput={(e) => {
                     const ev = e as any
@@ -116,7 +116,7 @@ function DataSource() {
                 />
               </div>
               <p className="text-base text-muted-foreground leading-relaxed">
-                请联系第三方服务提供商获取API密钥。密钥将安全存储在本地。
+                请联系第三方服务提供商（如新榜、清博等）获取API密钥。密钥格式通常为：sk_开头的字符串。密钥将安全存储在本地。
               </p>
             </div>
           </div>

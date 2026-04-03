@@ -11,7 +11,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async () => {
-    if (!agreed) {
+    // 注册时才需要勾选协议
+    if (!isLogin && !agreed) {
       Taro.showToast({title: '请先同意用户协议和隐私政策', icon: 'none'})
       return
     }
@@ -57,6 +58,7 @@ export default function Login() {
   }
 
   const handleWechatLogin = async () => {
+    // 微信登录也需要勾选协议（首次登录即注册）
     if (!agreed) {
       Taro.showToast({title: '请先同意用户协议和隐私政策', icon: 'none'})
       return
@@ -95,6 +97,14 @@ export default function Login() {
       <div className="flex flex-col gap-2 mb-12">
         <h1 className="text-4xl text-foreground font-bold">公众号内容聚合助手</h1>
         <p className="text-xl text-muted-foreground">定时聚合，精准推送</p>
+      </div>
+
+      {/* 当前模式标题 */}
+      <div className="flex flex-col gap-2 mb-6">
+        <h2 className="text-3xl text-foreground font-bold">{isLogin ? '登录' : '注册'}</h2>
+        <p className="text-base text-muted-foreground">
+          {isLogin ? '欢迎回来，请登录您的账号' : '创建新账号，开始使用'}
+        </p>
       </div>
 
       {/* 表单 */}
