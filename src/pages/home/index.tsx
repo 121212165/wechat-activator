@@ -1,4 +1,4 @@
-import {useState, useCallback, useEffect} from 'react'
+import {useState, useCallback, useEffect, useRef} from 'react'
 import Taro, {useDidShow} from '@tarojs/taro'
 import {useAuth} from '@/contexts/AuthContext'
 import {withRouteGuard} from '@/components/RouteGuard'
@@ -6,39 +6,52 @@ import {getTodayArticles, getKeywords, getAccounts} from '@/db/api'
 import {supabase} from '@/client/supabase'
 import type {ArticleWithDetails, Keyword} from '@/db/types'
 
+// 防抖延迟时间（毫秒）
+const DEBOUNCE_DELAY = 1000
+
 function Home() {
   const {user} = useAuth()
   const [articles, setArticles] = useState<ArticleWithDetails[]>([])
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  
+  // 用于防抖的 ref
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const isRequestingRef = useRef(false)
 
   const loadData = useCallback(async () => {
     if (!user) return
 
     setLoading(true)
-    const [articlesData, keywordsData, accountsData] = await Promise.all([
-      getTodayArticles(user.id),
-      getKeywords(user.id),
-      getAccounts(user.id)
-    ])
-    setArticles(articlesData)
-    setKeywords(keywordsData)
-    setLoading(false)
-
-    // 检查是否需要引导用户配置
-    if (keywordsData.length === 0 || accountsData.length === 0) {
-      Taro.showModal({
-        title: '提示',
-        content: '请先前往配置页添加关键词和公众号',
-        showCancel: false,
-        confirmText: '去配置',
-        success: (res) => {
-          if (res.confirm) {
-            Taro.switchTab({url: '/pages/config/index'})
+    try {
+      const [articlesData, keywordsData, accountsData] = await Promise.all([
+        getTodayArticles(user.id),
+        getKeywords(user.id),
+        getAccounts(user.id)
+      ])
+      setArticles(articlesData)
+      setKeywords(keywordsData)
+      
+      // 检查是否需要引导用户配置
+      if (keywordsData.length === 0 || accountsData.length === 0) {
+        Taro.showModal({
+          title: '提示',
+          content: '请先前往配置页添加关键词和公众号',
+          showCancel: false,
+          confirmText: '去配置',
+          success: (res) => {
+            if (res.confirm) {
+              Taro.switchTab({url: '/pages/config/index'})
+            }
           }
-        }
-      })
+        })
+      }
+    } catch (error) {
+      console.error('加载数据失败:', error)
+      Taro.showToast({title: '加载失败', icon: 'none'})
+    } finally {
+      setLoading(false)
     }
   }, [user])
 
@@ -51,81 +64,116 @@ function Home() {
   }, [loadData])
 
   const handleRefresh = async () => {
-    setRefreshing(true)
-    
-    // 获取用户配置的数据源
-    const dataSource = Taro.getStorageSync('dataSource') || 'sogou'
-    const useThirdPartyApi = dataSource === 'third_party'
-    
-    // 根据数据源调用不同的Edge Function
-    try {
-      if (useThirdPartyApi || dataSource === 'sogou') {
-        // 使用真实数据源（搜狗微信或第三方API）
-        Taro.showLoading({title: '抓取中...', mask: true})
-        const {data, error} = await supabase.functions.invoke('fetch_articles_real', {
-          body: {user_id: user!.id, use_third_party_api: useThirdPartyApi}
-        })
-        Taro.hideLoading()
+    // 防抖处理：如果正在请求或定时器未结束，直接返回
+    if (isRequestingRef.current) {
+      console.log('请求正在进行中，忽略本次刷新')
+      return
+    }
+
+    // 清除之前的定时器
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+    }
+
+    // 设置延迟执行
+    refreshTimerRef.current = setTimeout(async () => {
+      if (isRequestingRef.current) return
+      
+      isRequestingRef.current = true
+      setRefreshing(true)
+      
+      try {
+        // 获取用户配置的数据源
+        const dataSource = Taro.getStorageSync('dataSource') || 'sogou'
+        const useThirdPartyApi = dataSource === 'third_party'
         
-        if (error) {
-          const errorMsg = await error?.context?.text?.()
-          console.error('抓取文章失败:', errorMsg || error.message)
+        // 根据数据源调用不同的 Edge Function
+        if (useThirdPartyApi || dataSource === 'sogou') {
+          // 使用真实数据源（搜狗微信或第三方 API）
+          Taro.showLoading({title: '抓取中...', mask: true})
           
-          // 如果真实数据源失败，询问是否使用模拟数据
-          const res = await Taro.showModal({
-            title: '抓取失败',
-            content: '真实数据抓取失败，是否使用模拟数据？',
-            confirmText: '使用模拟数据',
-            cancelText: '取消'
+          try {
+            const {data, error} = await supabase.functions.invoke('fetch_articles_real', {
+              body: {user_id: user!.id, use_third_party_api: useThirdPartyApi}
+            })
+            Taro.hideLoading()
+            
+            if (error) {
+              const errorMsg = await error?.context?.text?.()
+              console.error('抓取文章失败:', errorMsg || error.message)
+              
+              // 如果真实数据源失败，询问是否使用模拟数据
+              const res = await Taro.showModal({
+                title: '抓取失败',
+                content: '真实数据抓取失败，是否使用模拟数据？',
+                confirmText: '使用模拟数据',
+                cancelText: '取消'
+              })
+              
+              if (res.confirm) {
+                await supabase.functions.invoke('fetch_articles', {
+                  body: {user_id: user!.id}
+                })
+                Taro.showToast({title: '已生成模拟数据', icon: 'success', duration: 2000})
+              }
+            } else {
+              const articlesCount = data?.articles_count || 0
+              const successCount = data?.success_count || 0
+              const failCount = data?.fail_count || 0
+              
+              if (articlesCount > 0) {
+                Taro.showToast({
+                  title: `成功抓取${articlesCount}篇文章`,
+                  icon: 'success',
+                  duration: 2000
+                })
+              } else {
+                Taro.showModal({
+                  title: '提示',
+                  content: `未找到新文章\n成功：${successCount} | 失败：${failCount}`,
+                  showCancel: false
+                })
+              }
+            }
+          } catch (fetchError) {
+            Taro.hideLoading()
+            console.error('请求超时或失败:', fetchError)
+            Taro.showToast({title: '请求超时', icon: 'none', duration: 2000})
+          }
+        } else {
+          // 使用模拟数据源
+          const {error} = await supabase.functions.invoke('fetch_articles', {
+            body: {user_id: user!.id}
           })
           
-          if (res.confirm) {
-            await supabase.functions.invoke('fetch_articles', {
-              body: {user_id: user!.id}
-            })
+          if (error) {
+            console.error('生成模拟数据失败:', error)
+            Taro.showToast({title: '操作失败', icon: 'none', duration: 2000})
+          } else {
             Taro.showToast({title: '已生成模拟数据', icon: 'success', duration: 2000})
           }
-        } else {
-          const articlesCount = data?.articles_count || 0
-          const successCount = data?.success_count || 0
-          const failCount = data?.fail_count || 0
-          
-          if (articlesCount > 0) {
-            Taro.showToast({
-              title: `成功抓取${articlesCount}篇文章`,
-              icon: 'success',
-              duration: 2000
-            })
-          } else {
-            Taro.showModal({
-              title: '提示',
-              content: `未找到新文章\n成功: ${successCount} | 失败: ${failCount}`,
-              showCancel: false
-            })
-          }
         }
-      } else {
-        // 使用模拟数据源
-        const {error} = await supabase.functions.invoke('fetch_articles', {
-          body: {user_id: user!.id}
-        })
         
-        if (error) {
-          console.error('生成模拟数据失败:', error)
-          Taro.showToast({title: '操作失败', icon: 'none', duration: 2000})
-        } else {
-          Taro.showToast({title: '已生成模拟数据', icon: 'success', duration: 2000})
-        }
+        // 刷新数据
+        await loadData()
+      } catch (error) {
+        console.error('抓取文章异常:', error)
+        Taro.showToast({title: '操作失败', icon: 'none', duration: 2000})
+      } finally {
+        setRefreshing(false)
+        isRequestingRef.current = false
       }
-    } catch (error) {
-      console.error('抓取文章异常:', error)
-      Taro.showToast({title: '操作失败', icon: 'none', duration: 2000})
-    }
-    
-    // 刷新数据
-    await loadData()
-    setRefreshing(false)
+    }, DEBOUNCE_DELAY)
   }
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+      }
+    }
+  }, [])
 
   // 按关键词分组文章
   const groupedArticles = keywords.reduce(
