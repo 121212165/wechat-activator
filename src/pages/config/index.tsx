@@ -78,13 +78,15 @@ function Config() {
     loadData()
   }, [loadData])
 
+
   const handleAddKeyword = async () => {
+    // 前端边界检查
     if (keywords.length >= 10) {
-      Taro.showToast({title: '最多支持10个关键词', icon: 'none'})
+      Taro.showToast({title: '最多支持 10 个关键词', icon: 'none'})
       return
     }
 
-    // 使用prompt方式获取输入
+    // 使用 prompt 方式获取输入
     Taro.showModal({
       title: '添加关键词',
       content: '请在下方输入框输入关键词',
@@ -95,19 +97,32 @@ function Config() {
           const availableKeywords = presetKeywords.filter(
             (k) => !keywords.some((kw) => kw.keyword === k)
           )
-          
+
           if (availableKeywords.length === 0) {
             Taro.showToast({title: '请手动输入关键词', icon: 'none'})
             return
           }
 
           const keyword = availableKeywords[0]
+
+          // 二次检查：确保不超过限制
+          if (keywords.length >= 10) {
+            Taro.showToast({title: '关键词数量已达上限', icon: 'none'})
+            return
+          }
+
+          // 验证关键词长度
+          if (keyword.trim().length === 0 || keyword.trim().length > 50) {
+            Taro.showToast({title: '关键词长度必须在 1-50 字符之间', icon: 'none'})
+            return
+          }
+
           const result = await addKeyword(user!.id, keyword)
           if (result) {
             Taro.showToast({title: '添加成功', icon: 'success'})
             loadData()
           } else {
-            Taro.showToast({title: '添加失败', icon: 'none'})
+            Taro.showToast({title: '添加失败，可能已存在相同关键词', icon: 'none'})
           }
         }
       }
@@ -158,9 +173,11 @@ function Config() {
     }
   }
 
+
   const handleAddAccount = async () => {
+    // 前端边界检查
     if (accounts.length >= 20) {
-      Taro.showToast({title: '最多支持20个公众号', icon: 'none'})
+      Taro.showToast({title: '最多支持 20 个公众号', icon: 'none'})
       return
     }
 
@@ -175,19 +192,32 @@ function Config() {
           const availableAccounts = presetAccounts.filter(
             (a) => !accounts.some((acc) => acc.account_name === a)
           )
-          
+
           if (availableAccounts.length === 0) {
             Taro.showToast({title: '请手动输入公众号名称', icon: 'none'})
             return
           }
 
           const accountName = availableAccounts[0]
+
+          // 二次检查：确保不超过限制
+          if (accounts.length >= 20) {
+            Taro.showToast({title: '公众号数量已达上限', icon: 'none'})
+            return
+          }
+
+          // 验证公众号名称长度
+          if (accountName.trim().length === 0 || accountName.trim().length > 100) {
+            Taro.showToast({title: '公众号名称长度必须在 1-100 字符之间', icon: 'none'})
+            return
+          }
+
           const result = await addAccount(user!.id, accountName)
           if (result) {
             Taro.showToast({title: '添加成功', icon: 'success'})
             loadData()
           } else {
-            Taro.showToast({title: '添加失败', icon: 'none'})
+            Taro.showToast({title: '添加失败，可能已存在相同公众号', icon: 'none'})
           }
         }
       }

@@ -7,59 +7,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 // 时间过滤：只获取最近7天的文章
 const DAYS_FILTER = 7
 
-// 请求超时时间（毫秒）
-const REQUEST_TIMEOUT = 10000
-
-// 重试配置
-const MAX_RETRIES = 2
-const RETRY_DELAY = 1000
-
-// 带超时的 fetch 封装
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = REQUEST_TIMEOUT): Promise<Response> {
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    })
-    clearTimeout(timeoutId)
-    return response
-  } catch (error) {
-    clearTimeout(timeoutId)
-    if (error.name === 'AbortError') {
-      throw new Error(`请求超时 (${timeout}ms)`)
-    }
-    throw error
-  }
-}
-
-// 带重试的 fetch 封装
-async function fetchWithRetry(url: string, options: RequestInit = {}, maxRetries = MAX_RETRIES): Promise<Response> {
-  let lastError: Error | null = null
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetchWithTimeout(url, options)
-      if (response.ok) {
-        return response
-      }
-      lastError = new Error(`HTTP ${response.status}`)
-    } catch (error) {
-      lastError = error as Error
-      console.error(`请求失败 (尝试 ${attempt + 1}/${maxRetries + 1}):`, error)
-    }
-    
-    // 如果不是最后一次尝试，等待后重试
-    if (attempt < maxRetries) {
-      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (attempt + 1)))
-    }
-  }
-  
-  throw lastError || new Error('请求失败')
-}
-
 // 搜狗微信搜索API
 async function searchSogouWeixin(keyword: string, accountName: string): Promise<any[]> {
   try {
@@ -68,7 +15,7 @@ async function searchSogouWeixin(keyword: string, accountName: string): Promise<
       keyword + ' ' + accountName
     )}`
 
-    const response = await fetchWithRetry(searchUrl, {
+    const response = await fetch(searchUrl, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -267,7 +214,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const {user_id, use_third_party_api = false, last_fetch_time} = await req.json().catch(() => ({}))
+    const {user_id, use_third_party_api = false} = await req.json().catch(() => ({}))
     if (!user_id) {
       return new Response(JSON.stringify({message: '缺少user_id'}), {
         status: 400,
