@@ -4,6 +4,9 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+// 时间过滤：只获取最近7天的文章
+const DAYS_FILTER = 7
+
 // 搜狗微信搜索API
 async function searchSogouWeixin(keyword: string, accountName: string): Promise<any[]> {
   try {
@@ -187,6 +190,23 @@ Deno.serve(async (req) => {
     let successCount = 0
     let failCount = 0
 
+    // 获取用户最近7天的文章标题（用于去重）
+    const sevenDaysAgo = new Date(Date.now() - DAYS_FILTER * 24 * 60 * 60 * 1000).toISOString()
+    const {data: existingArticles} = await supabase
+      .from('articles')
+      .select('title, link')
+      .eq('user_id', user_id)
+      .gte('created_at', sevenDaysAgo)
+
+    const existingTitles = new Set<string>()
+    const existingLinks = new Set<string>()
+    if (existingArticles) {
+      existingArticles.forEach((a) => {
+        existingTitles.add(a.title)
+        if (a.link) existingLinks.add(a.link)
+      })
+    }
+
     for (const keyword of keywords) {
       for (const account of accounts) {
         try {
@@ -198,15 +218,31 @@ Deno.serve(async (req) => {
           if (articles.length > 0) {
             successCount++
             for (const article of articles) {
-              articlesToInsert.push({
-                user_id,
-                keyword_id: keyword.id,
-                account_id: account.id,
-                title: article.title,
-                summary: article.summary,
-                link: article.link,
-                published_at: article.published_at
-              })
+              // 检查是否重复（标题或链接）
+              const isDuplicate =
+                existingTitles.has(article.title) ||
+                (article.link && existingLinks.has(article.link))
+
+              if (!isDuplicate) {
+                // 检查发布时间是否在7天内
+                const publishedAt = new Date(article.published_at)
+                const isRecent = publishedAt >= new Date(sevenDaysAgo)
+
+                if (isRecent) {
+                  articlesToInsert.push({
+                    user_id,
+                    keyword_id: keyword.id,
+                    account_id: account.id,
+                    title: article.title,
+                    summary: article.summary,
+                    link: article.link,
+                    published_at: article.published_at
+                  })
+                  // 添加到去重集合
+                  existingTitles.add(article.title)
+                  if (article.link) existingLinks.add(article.link)
+                }
+              }
             }
           } else {
             failCount++
@@ -221,38 +257,21 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 插入文章（去重）
+    // 插入文章
     if (articlesToInsert.length > 0) {
-      // 检查是否已存在相同标题的文章
-      const existingTitles = new Set<string>()
-      const {data: existingArticles} = await supabase
-        .from('articles')
-        .select('title')
-        .eq('user_id', user_id)
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // 最近7天
+      const {error: insertError} = await supabase.from('articles').insert(articlesToInsert)
 
-      if (existingArticles) {
-        existingArticles.forEach((a) => existingTitles.add(a.title))
-      }
-
-      // 过滤已存在的文章
-      const newArticles = articlesToInsert.filter((a) => !existingTitles.has(a.title))
-
-      if (newArticles.length > 0) {
-        const {error: insertError} = await supabase.from('articles').insert(newArticles)
-
-        if (insertError) {
-          return new Response(JSON.stringify({message: `插入文章失败: ${insertError.message}`}), {
-            status: 500,
-            headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
-          })
-        }
+      if (insertError) {
+        return new Response(JSON.stringify({message: `插入文章失败: ${insertError.message}`}), {
+          status: 500,
+          headers: {'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*'}
+        })
       }
 
       return new Response(
         JSON.stringify({
           message: '文章抓取完成',
-          articles_count: newArticles.length,
+          articles_count: articlesToInsert.length,
           success_count: successCount,
           fail_count: failCount,
           data_source: use_third_party_api ? 'third_party_api' : 'sogou_weixin'
