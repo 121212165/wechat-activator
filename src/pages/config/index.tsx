@@ -2,7 +2,16 @@ import {useState, useCallback, useEffect} from 'react'
 import Taro, {useDidShow} from '@tarojs/taro'
 import {useAuth} from '@/contexts/AuthContext'
 import {withRouteGuard} from '@/components/RouteGuard'
-import {getKeywords, addKeyword, deleteKeyword, getAccounts, addAccount, deleteAccount} from '@/db/api'
+import {
+  getKeywords,
+  addKeyword,
+  updateKeyword,
+  deleteKeyword,
+  getAccounts,
+  addAccount,
+  updateAccount,
+  deleteAccount
+} from '@/db/api'
 import type {Keyword, Account} from '@/db/types'
 
 function Config() {
@@ -11,6 +20,10 @@ function Config() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(false)
   const [initializing, setInitializing] = useState(false)
+  const [editingKeywordId, setEditingKeywordId] = useState<string | null>(null)
+  const [editingKeywordText, setEditingKeywordText] = useState('')
+  const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
+  const [editingAccountText, setEditingAccountText] = useState('')
 
   const loadData = useCallback(async () => {
     if (!user) return
@@ -101,6 +114,33 @@ function Config() {
     })
   }
 
+  const handleEditKeyword = (keyword: Keyword) => {
+    setEditingKeywordId(keyword.id)
+    setEditingKeywordText(keyword.keyword)
+  }
+
+  const handleSaveKeyword = async () => {
+    if (!editingKeywordText.trim()) {
+      Taro.showToast({title: '关键词不能为空', icon: 'none'})
+      return
+    }
+
+    const success = await updateKeyword(editingKeywordId!, editingKeywordText.trim())
+    if (success) {
+      Taro.showToast({title: '更新成功', icon: 'success'})
+      setEditingKeywordId(null)
+      setEditingKeywordText('')
+      loadData()
+    } else {
+      Taro.showToast({title: '更新失败', icon: 'none'})
+    }
+  }
+
+  const handleCancelEditKeyword = () => {
+    setEditingKeywordId(null)
+    setEditingKeywordText('')
+  }
+
   const handleDeleteKeyword = async (keywordId: string, keywordText: string) => {
     const res = await Taro.showModal({
       title: '确认删除',
@@ -152,6 +192,33 @@ function Config() {
         }
       }
     })
+  }
+
+  const handleEditAccount = (account: Account) => {
+    setEditingAccountId(account.id)
+    setEditingAccountText(account.account_name)
+  }
+
+  const handleSaveAccount = async () => {
+    if (!editingAccountText.trim()) {
+      Taro.showToast({title: '公众号名称不能为空', icon: 'none'})
+      return
+    }
+
+    const success = await updateAccount(editingAccountId!, editingAccountText.trim())
+    if (success) {
+      Taro.showToast({title: '更新成功', icon: 'success'})
+      setEditingAccountId(null)
+      setEditingAccountText('')
+      loadData()
+    } else {
+      Taro.showToast({title: '更新失败', icon: 'none'})
+    }
+  }
+
+  const handleCancelEditAccount = () => {
+    setEditingAccountId(null)
+    setEditingAccountText('')
   }
 
   const handleDeleteAccount = async (accountId: string, accountName: string) => {
@@ -221,13 +288,53 @@ function Config() {
                 <div
                   key={keyword.id}
                   className="flex items-center justify-between py-4 border-b border-border">
-                  <span className="text-xl text-foreground">{keyword.keyword}</span>
-                  <button
-                    type="button"
-                    className="flex items-center justify-center leading-none text-xl text-destructive"
-                    onClick={() => handleDeleteKeyword(keyword.id, keyword.keyword)}>
-                    <div className="i-mdi-delete text-2xl" />
-                  </button>
+                  {editingKeywordId === keyword.id ? (
+                    // 编辑模式
+                    <div className="flex-1 flex items-center gap-3">
+                      <div className="flex-1 border border-accent bg-card px-4 py-2 overflow-hidden">
+                        <input
+                          className="w-full text-xl text-foreground bg-transparent outline-none"
+                          type="text"
+                          value={editingKeywordText}
+                          onInput={(e) => {
+                            const ev = e as any
+                            setEditingKeywordText(ev.detail?.value ?? ev.target?.value ?? '')
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="flex items-center justify-center leading-none text-xl text-accent"
+                        onClick={handleSaveKeyword}>
+                        <div className="i-mdi-check text-2xl" />
+                      </button>
+                      <button
+                        type="button"
+                        className="flex items-center justify-center leading-none text-xl text-muted-foreground"
+                        onClick={handleCancelEditKeyword}>
+                        <div className="i-mdi-close text-2xl" />
+                      </button>
+                    </div>
+                  ) : (
+                    // 显示模式
+                    <>
+                      <span className="text-xl text-foreground">{keyword.keyword}</span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          className="flex items-center justify-center leading-none text-xl text-accent"
+                          onClick={() => handleEditKeyword(keyword)}>
+                          <div className="i-mdi-pencil text-2xl" />
+                        </button>
+                        <button
+                          type="button"
+                          className="flex items-center justify-center leading-none text-xl text-destructive"
+                          onClick={() => handleDeleteKeyword(keyword.id, keyword.keyword)}>
+                          <div className="i-mdi-delete text-2xl" />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -259,13 +366,53 @@ function Config() {
                 <div
                   key={account.id}
                   className="flex items-center justify-between py-4 border-b border-border">
-                  <span className="text-xl text-foreground">{account.account_name}</span>
-                  <button
-                    type="button"
-                    className="flex items-center justify-center leading-none text-xl text-destructive"
-                    onClick={() => handleDeleteAccount(account.id, account.account_name)}>
-                    <div className="i-mdi-delete text-2xl" />
-                  </button>
+                  {editingAccountId === account.id ? (
+                    // 编辑模式
+                    <div className="flex-1 flex items-center gap-3">
+                      <div className="flex-1 border border-accent bg-card px-4 py-2 overflow-hidden">
+                        <input
+                          className="w-full text-xl text-foreground bg-transparent outline-none"
+                          type="text"
+                          value={editingAccountText}
+                          onInput={(e) => {
+                            const ev = e as any
+                            setEditingAccountText(ev.detail?.value ?? ev.target?.value ?? '')
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="flex items-center justify-center leading-none text-xl text-accent"
+                        onClick={handleSaveAccount}>
+                        <div className="i-mdi-check text-2xl" />
+                      </button>
+                      <button
+                        type="button"
+                        className="flex items-center justify-center leading-none text-xl text-muted-foreground"
+                        onClick={handleCancelEditAccount}>
+                        <div className="i-mdi-close text-2xl" />
+                      </button>
+                    </div>
+                  ) : (
+                    // 显示模式
+                    <>
+                      <span className="text-xl text-foreground">{account.account_name}</span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          className="flex items-center justify-center leading-none text-xl text-accent"
+                          onClick={() => handleEditAccount(account)}>
+                          <div className="i-mdi-pencil text-2xl" />
+                        </button>
+                        <button
+                          type="button"
+                          className="flex items-center justify-center leading-none text-xl text-destructive"
+                          onClick={() => handleDeleteAccount(account.id, account.account_name)}>
+                          <div className="i-mdi-delete text-2xl" />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

@@ -56,6 +56,16 @@ export async function addKeyword(userId: string, keyword: string): Promise<Keywo
   return data
 }
 
+export async function updateKeyword(keywordId: string, keyword: string): Promise<boolean> {
+  const {error} = await supabase.from('keywords').update({keyword}).eq('id', keywordId)
+
+  if (error) {
+    console.error('更新关键词失败:', error)
+    return false
+  }
+  return true
+}
+
 export async function deleteKeyword(keywordId: string): Promise<boolean> {
   const {error} = await supabase.from('keywords').delete().eq('id', keywordId)
 
@@ -94,6 +104,16 @@ export async function addAccount(userId: string, accountName: string): Promise<A
     return null
   }
   return data
+}
+
+export async function updateAccount(accountId: string, accountName: string): Promise<boolean> {
+  const {error} = await supabase.from('accounts').update({account_name: accountName}).eq('id', accountId)
+
+  if (error) {
+    console.error('更新公众号失败:', error)
+    return false
+  }
+  return true
 }
 
 export async function deleteAccount(accountId: string): Promise<boolean> {
