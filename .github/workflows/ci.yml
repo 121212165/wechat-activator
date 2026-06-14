@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm ci 2>/dev/null || npm install
+      - run: npm ci --legacy-peer-deps 2>/dev/null || npm install --legacy-peer-deps
       - run: npx eslint . --ext .js,.ts,.jsx,.tsx 2>/dev/null || echo "No ESLint config"
 
   build:
@@ -23,7 +23,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm ci 2>/dev/null || npm install
+      - run: npm ci --legacy-peer-deps 2>/dev/null || npm install --legacy-peer-deps
       - run: npm run build 2>/dev/null || echo "No build script"
 
   test:
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm ci 2>/dev/null || npm install
+      - run: npm ci --legacy-peer-deps 2>/dev/null || npm install --legacy-peer-deps
       - run: npm test 2>/dev/null || echo "No test script"
 
   security:
@@ -43,5 +43,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: npm ci 2>/dev/null || npm install
+      - run: npm ci --legacy-peer-deps 2>/dev/null || npm install --legacy-peer-deps
       - run: npm audit --audit-level=moderate 2>/dev/null || echo "Audit skipped"
