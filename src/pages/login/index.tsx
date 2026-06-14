@@ -4,6 +4,7 @@ import {useAuth} from '@/contexts/AuthContext'
 
 export default function Login() {
   const {signInWithUsername, signUpWithUsername, signInWithWechat} = useAuth()
+
   const [isLogin, setIsLogin] = useState(true)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -46,7 +47,7 @@ export default function Login() {
     if (redirectPath) {
       Taro.removeStorageSync('loginRedirectPath')
       const normalizedPath = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`
-      const tabBarPages = ['/pages/home/index', '/pages/config/index', '/pages/profile/index']
+      const tabBarPages = ['/pages/home/index', '/pages/settings/index']
       if (tabBarPages.includes(normalizedPath)) {
         Taro.switchTab({url: normalizedPath})
       } else {
@@ -58,7 +59,6 @@ export default function Login() {
   }
 
   const handleWechatLogin = async () => {
-    // 微信登录也需要勾选协议（首次登录即注册）
     if (!agreed) {
       Taro.showToast({title: '请先同意用户协议和隐私政策', icon: 'none'})
       return
@@ -75,12 +75,11 @@ export default function Login() {
 
     Taro.showToast({title: '登录成功', icon: 'success'})
 
-    // 登录成功后跳转
     const redirectPath = Taro.getStorageSync('loginRedirectPath')
     if (redirectPath) {
       Taro.removeStorageSync('loginRedirectPath')
       const normalizedPath = redirectPath.startsWith('/') ? redirectPath : `/${redirectPath}`
-      const tabBarPages = ['/pages/home/index', '/pages/config/index', '/pages/profile/index']
+      const tabBarPages = ['/pages/home/index', '/pages/settings/index']
       if (tabBarPages.includes(normalizedPath)) {
         Taro.switchTab({url: normalizedPath})
       } else {

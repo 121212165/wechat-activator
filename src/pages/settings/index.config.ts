@@ -1,5 +1,5 @@
 export default definePageConfig({
-  navigationBarTitleText: '配置管理',
+  navigationBarTitleText: '设置',
   enableShareAppMessage: true,
   enableShareTimeline: true
 })

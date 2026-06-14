@@ -35,7 +35,7 @@ function Home() {
         confirmText: '去配置',
         success: (res) => {
           if (res.confirm) {
-            Taro.switchTab({url: '/pages/config/index'})
+            Taro.switchTab({url: '/pages/settings/index'})
           }
         }
       })
